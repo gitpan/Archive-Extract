@@ -24,7 +24,7 @@ use constant ZIP            => 'zip';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.02';
+$VERSION        = '0.03';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -426,27 +426,33 @@ sub _untar_bin {
                                 $self->archive, $buffer ));
         }      
         
-        my $file  = File::Basename::basename( $self->archive );
-
-        ### if we're on solaris we /might/ be using /bin/tar, which has
-        ### a weird output format... we might also be using /usr/local/bin/tar,
-        ### which is gnu tar, which is perfectly fine... so we have to do some
-        ### guessing here =/
-        my @files = map { chomp; 
+        unless( $buffer ) {
+            $self->_error(loc("No buffer captured, unable to tell extracted ".
+                              "files or extraction dir for '%1'",
+                              $self->archive));
+        } else {                         
+            ### if we're on solaris we /might/ be using /bin/tar, which has
+            ### a weird output format... we might also be using
+            ### /usr/local/bin/tar, which is gnu tar, which is perfectly fine...
+            ### so we have to do some guessing here =/
+            my @files = map { chomp; 
                           !ON_SOLARIS ? $_ 
                                       : (m|^ x \s+       # 'xtract' -- sigh
                                             (.+?),      # the actual file name
                                             \s+ [\d,.]+ \s bytes,
                                             \s+ [\d,.]+ \s tape \s blocks
                                         |x ? $1 : $_); 
+       
                     } split $/, $buffer;
-        my ($dir) = -d $files[0] ? $files[0] : dirname ($files[0]);
+       
+            my ($dir) = -d $files[0] ? $files[0] : dirname($files[0]);
  
-        ### store the files that are in the archive ###
-        $self->files(\@files);
+            ### store the files that are in the archive ###
+            $self->files(\@files);
          
-        ### store the extraction dir ###
-        $self->extract_path( File::Spec->rel2abs($dir) );    
+            ### store the extraction dir ###
+            $self->extract_path( File::Spec->rel2abs($dir) );    
+        }
     }
   
     ### we got here, no error happened
@@ -562,6 +568,11 @@ sub _gunzip_bin {
                                     $self->archive, $buffer));                     
     }
     
+    unless( $buffer ) {
+        $self->_error(loc("No buffer captured, unable to get content for '%1'",
+                          $self->archive));
+    }
+    
     print $fh $buffer if defined $buffer;
     
     close $fh;
@@ -642,7 +653,14 @@ sub _unzip_bin {
                                         $self->archive, $buffer));                     
         }
     
-        $self->files( [split $/, $buffer] );
+        unless( $buffer ) {
+            $self->_error(loc("No buffer captured, unable to tell extracted ".
+                              "files or extraction dir for '%1'",
+                              $self->archive));
+        
+        } else {
+            $self->files( [split $/, $buffer] );
+        }
     }
         
     ### now, extract the archive ###
@@ -657,10 +675,12 @@ sub _unzip_bin {
                                         $self->archive, $buffer));                     
         }
     
-        my $files   = $self->files;
-        my $dir     = -d $files->[0] ? $files->[0] : dirname( $files->[0] );             
+        if( scalar @{$self->files} ) {
+            my $files   = $self->files;
+            my $dir     = -d $files->[0] ? $files->[0] : dirname( $files->[0] );             
     
-        $self->extract_path( File::Spec->rel2abs($dir) );
+            $self->extract_path( File::Spec->rel2abs($dir) );
+        }
     }
     
     return 1;

@@ -70,47 +70,71 @@ for my $switch (0,1) {
         my $method = $tmpl->{$archive}->{method};
         ok( $ae->$method(), "Archive type recognized properly" );
     
-    ### 7 tests from here on down ###
+    ### 8 tests from here on down ###
     SKIP: {
         
         ### check if we can run this test ###
-        {   my $pgm_fail; my $mod_fail;
-            for my $pgm ( @{$tmpl->{$archive}->{programs}} ) {
-                $pgm_fail++ unless $Archive::Extract::PROGRAMS->{$pgm} &&
-                                   $Archive::Extract::PROGRAMS->{$pgm}; 
-                        
-            }
-            
-            for my $mod ( @{$tmpl->{$archive}->{modules}} ) {
-                $mod_fail++ unless check_install( module => $mod );
-            }
-            
-            skip "No binaries or modules to extract ".$archive, 8
-                if $mod_fail && $pgm_fail;
+        my $pgm_fail; my $mod_fail;
+        for my $pgm ( @{$tmpl->{$archive}->{programs}} ) {
+            $pgm_fail++ unless $Archive::Extract::PROGRAMS->{$pgm} &&
+                               $Archive::Extract::PROGRAMS->{$pgm}; 
+                    
         }
-
-        my $to = $ae->is_gz ? $OutPath : $OutDir;
-
-        my $rv = $ae->extract( to => $to );
         
-        ok( $rv,            "extract() for '$archive' reports success" );
-    
-        diag("Extractor was: " . $ae->_extractor) if $Debug;
-           
-        is( scalar @{ $ae->files || []}, 1,
-                            "Found correct number of output files" );
-        is( $ae->files->[0], $OutFile,
-                            "Found correct output file '$OutFile'" );
-    
-        ok( -e $OutPath,    "Output file '$OutPath' exists" );
-        ok( $ae->extract_path,
-                            "Extract dir found" );
-        ok( -d $ae->extract_path,
-                            "Extract dir exists" );                       
-        is( $ae->extract_path, $OutDir,
-                            "Extract dir is expected path '$OutDir'" );
+        for my $mod ( @{$tmpl->{$archive}->{modules}} ) {
+            $mod_fail++ unless check_install( module => $mod );
+        }
         
-        unlink $OutPath;
-        ok( !(-e $OutPath), "Output file succesfully removed" );
+        skip "No binaries or modules to extract ".$archive, 8
+            if $mod_fail && $pgm_fail;
+        
+        
+        for my $use_buffer (1,0) {
+
+            ### test buffers ###
+            my $turn_off = !$use_buffer &&!$pgm_fail &&                 
+                            $Archive::Extract::PREFER_BIN;
+                           
+            ### whitebox test ###
+            ### stupid warnings ###
+            local $IPC::Cmd::USE_IPC_RUN    = 0 if $turn_off;
+            local $IPC::Cmd::USE_IPC_RUN    = 0 if $turn_off;
+            local $IPC::Cmd::USE_IPC_OPEN3  = 0 if $turn_off;
+            local $IPC::Cmd::USE_IPC_OPEN3  = 0 if $turn_off;
+            
+            ### try extracting ###
+            my $to = $ae->is_gz ? $OutPath : $OutDir;
+    
+            my $rv = $ae->extract( to => $to );
+            
+            ok( $rv,            "extract() for '$archive' reports success" );
+        
+            diag("Extractor was: " . $ae->_extractor) if $Debug;
+            
+            SKIP: {
+                skip "No buffers available", 6,
+                    if $ae->error =~ /^No buffer captured/;
+                    
+                is( scalar @{ $ae->files || []}, 1,
+                                    "Found correct number of output files" );
+                is( $ae->files->[0], $OutFile,
+                                    "Found correct output file '$OutFile'" );
+            
+                ok( -e $OutPath,    "Output file '$OutPath' exists" );
+                ok( $ae->extract_path,
+                                    "Extract dir found" );
+                ok( -d $ae->extract_path,
+                                    "Extract dir exists" );                       
+                is( $ae->extract_path, $OutDir,
+                                    "Extract dir is expected path '$OutDir'" );
+            }
+        
+            unlink $OutPath;
+            ok( !(-e $OutPath), "Output file succesfully removed" );
+
+        }            
     } }
 }
+
+
+
