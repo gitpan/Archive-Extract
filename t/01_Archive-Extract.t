@@ -6,18 +6,16 @@ use lib qw[../lib];
 use Cwd                         qw[cwd];
 use Test::More                  qw[no_plan];
 use File::Spec; 
+use File::Path;
 use Data::Dumper;
 use Module::Load::Conditional   qw[check_install];
-
 
 my $Debug   = $ARGV[0] ? 1 : 0;
 
 my $Class   = 'Archive::Extract';
-my $OutFile = 'a';
 my $Self    = File::Spec->rel2abs( cwd() );
 my $SrcDir  = File::Spec->catdir( $Self,'src' );
 my $OutDir  = File::Spec->catdir( $Self,'out' );     
-my $OutPath = File::Spec->catfile( $OutDir, $OutFile );
 
 use_ok($Class);
 
@@ -27,26 +25,57 @@ $Archive::Extract::VERBOSE  = $Archive::Extract::VERBOSE = $Debug;
 $Archive::Extract::WARN     = $Archive::Extract::WARN    = $Debug ? 1 : 0;
 
 my $tmpl = {
+    ### plain files
     'x.tgz'     => {    programs    => [qw[gzip tar]],
                         modules     => [qw[Archive::Tar IO::Zlib]],
-                        method      => 'is_tgz'
+                        method      => 'is_tgz',
+                        outfile     => 'a',
                     },
     'x.tar.gz' => {     programs    => [qw[gzip tar]],
                         modules     => [qw[Archive::Tar IO::Zlib]],
-                        method      => 'is_tgz'
+                        method      => 'is_tgz',
+                        outfile     => 'a',
                     },
     'x.tar' => {    programs    => [qw[tar]],
                     modules     => [qw[Archive::Tar]],
-                    method      => 'is_tar'
+                    method      => 'is_tar',
+                    outfile     => 'a',
                 },
     'x.gz' => {     programs    => [qw[gzip]],
                     modules     => [qw[Compress::Zlib]],
-                    method      => 'is_gz'
+                    method      => 'is_gz',
+                    outfile     => 'a',
                 },
     'x.zip' => {    programs    => [qw[unzip]],
                     modules     => [qw[Archive::Zip]],
-                    method      => 'is_zip'
+                    method      => 'is_zip',
+                    outfile     => 'a',
                 },
+    ### with a directory                
+    'y.tgz'     => {    programs    => [qw[gzip tar]],
+                        modules     => [qw[Archive::Tar IO::Zlib]],
+                        method      => 'is_tgz',
+                        outfile     => 'z',
+                        outdir      => 'y'
+                    },
+    'y.tar.gz' => {     programs    => [qw[gzip tar]],
+                        modules     => [qw[Archive::Tar IO::Zlib]],
+                        method      => 'is_tgz',
+                        outfile     => 'z',
+                        outdir      => 'y'
+                    },
+    'y.tar' => {    programs    => [qw[tar]],
+                    modules     => [qw[Archive::Tar]],
+                    method      => 'is_tar',
+                    outfile     => 'z',
+                    outdir      => 'y'
+                },
+    'y.zip' => {    programs    => [qw[unzip]],
+                    modules     => [qw[Archive::Zip]],
+                    method      => 'is_zip',
+                    outfile     => 'z',
+                    outdir      => 'y'
+                },                
 };                
 
 
@@ -68,10 +97,16 @@ for my $switch (0,1) {
         isa_ok( $ae, $Class );
     
         my $method = $tmpl->{$archive}->{method};
-        ok( $ae->$method(), "Archive type recognized properly" );
+        ok( $ae->$method(),         "Archive type recognized properly" );
     
-    ### 8 tests from here on down ###
+    ### 10 tests from here on down ###
     SKIP: {
+        my $file        = $tmpl->{$archive}->{outfile};
+        my $dir         = $tmpl->{$archive}->{outdir};  # can be undef
+        my $rel_path    = File::Spec->catfile( grep { defined } $dir, $file );
+        my $abs_path    = File::Spec->catfile( $OutDir, $rel_path );
+        my $abs_dir     = File::Spec->catdir( grep { defined } $OutDir, $dir );
+                                            
         
         ### check if we can run this test ###
         my $pgm_fail; my $mod_fail;
@@ -85,7 +120,7 @@ for my $switch (0,1) {
             $mod_fail++ unless check_install( module => $mod );
         }
         
-        skip "No binaries or modules to extract ".$archive, 8
+        skip "No binaries or modules to extract ".$archive, 10
             if $mod_fail && $pgm_fail;
         
         
@@ -103,35 +138,44 @@ for my $switch (0,1) {
             local $IPC::Cmd::USE_IPC_OPEN3  = 0 if $turn_off;
             
             ### try extracting ###
-            my $to = $ae->is_gz ? $OutPath : $OutDir;
-    
+            my $to = $ae->is_gz ? $abs_path : $OutDir;
+
+            diag("Extracting to: $to")                  if $Debug;
+            diag("Buffers enabled: ".!$turn_off)        if $Debug;
+
             my $rv = $ae->extract( to => $to );
             
-            ok( $rv,            "extract() for '$archive' reports success" );
+            ok( $rv,                "extract() for '$archive' reports success");
         
-            diag("Extractor was: " . $ae->_extractor) if $Debug;
-            
+            diag("Extractor was: " . $ae->_extractor)   if $Debug;
+ 
             SKIP: {
                 skip "No buffers available", 6,
                     if $ae->error =~ /^No buffer captured/;
-                    
-                is( scalar @{ $ae->files || []}, 1,
+
+                ### might be 1 or 2, depending wether we extracted a dir too
+                my $file_cnt = grep { defined } $file, $dir;                    
+                is( scalar @{ $ae->files || []}, $file_cnt,
                                     "Found correct number of output files" );
-                is( $ae->files->[0], $OutFile,
-                                    "Found correct output file '$OutFile'" );
+                is( $ae->files->[-1], $rel_path,
+                                    "Found correct output file '$rel_path'" );
             
-                ok( -e $OutPath,    "Output file '$OutPath' exists" );
+                ok( -e $abs_path,   "Output file '$abs_path' exists" );
                 ok( $ae->extract_path,
                                     "Extract dir found" );
                 ok( -d $ae->extract_path,
                                     "Extract dir exists" );                       
-                is( $ae->extract_path, $OutDir,
-                                    "Extract dir is expected path '$OutDir'" );
+                is( $ae->extract_path, $abs_dir,
+                                    "Extract dir is expected path '$abs_dir'" );
             }
         
-            unlink $OutPath;
-            ok( !(-e $OutPath), "Output file succesfully removed" );
+            unlink $abs_path;
+            ok( !(-e $abs_path),     "Output file successfully removed" );
 
+            eval { rmtree( $ae->extract_path ) };
+            ok( !$@,                "   rmtree gave no error" );
+            ok( !(-d $ae->extract_path ),
+                                    "   Extracth dir succesfully removed" );
         }            
     } }
 }
