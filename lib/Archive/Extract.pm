@@ -24,7 +24,7 @@ use constant ZIP            => 'zip';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.03';
+$VERSION        = '0.05';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -76,7 +76,7 @@ Archive::Extract -- A generic archive extracting mechanism
 
 =head1 DESCRIPTION
 
-Archive::Extract is a generic archive extraction mechansim.
+Archive::Extract is a generic archive extraction mechanism.
 
 It allows you to extract any archive file of the type .tar, .tar.gz,
 .gz or .zip without having to worry how it does so, or use different
@@ -145,7 +145,7 @@ Corresponds to a C<.tgz> or C<.tar.gz> suffix.
 
 =item gz
 
-Gzip compressed file, as prodyced by, for example C</bin/gzip>.
+Gzip compressed file, as produced by, for example C</bin/gzip>.
 Corresponds to a C<.gz> suffix.
 
 =item zip
@@ -269,7 +269,9 @@ sub extract {
         while( my($type,$method) = each %$Mapping ) {
             
             ### call the corresponding method if the type is OK ###
-             $ok = $self->$method() if $self->$type();
+            if( $self->$type) {
+                $ok = $self->$method();
+            }       
         }
         
         ### warn something went wrong if we didn't get an OK ###
@@ -405,40 +407,44 @@ sub _untar_bin {
     ### currently i don't know how to get output of a command after a pipe
     ### trapped in a scalar. Mailed barries about this 5th of june 2004.
 
-    my $which_bin = $self->is_tgz ? 'tar/gzip' : 'tar';
-
-    ### now, we actually extract the archive ###
-    {   ### see what command we should run, based on whether 
-        ### it's a .tgz or .tar 
     
-        my $cmd = $self->is_tgz 
-                ? [$self->bin_gzip, '-cdf', $self->archive, '|', 
-                   $self->bin_tar, '-xvf', '-'] 
-                : [$self->bin_tar, '-xvf', $self->archive];         
+    
+    ### see what command we should run, based on whether 
+    ### it's a .tgz or .tar 
+    
+    ### XXX solaris tar and bsdtar are having different outputs
+    ### depending whether you run with -x or -t
+    ### compensate for this insanity by running -t first, then -x
+    
+    {    my $cmd = $self->is_tgz 
+            ? [$self->bin_gzip, '-cdf', $self->archive, '|', 
+               $self->bin_tar, '-tf', '-'] 
+            : [$self->bin_tar, '-tf', $self->archive];         
 
         ### run the command ###
-        my $buffer;
+        my $buffer = '';
         unless( scalar run( command => $cmd, 
                             buffer  => \$buffer,  
                             verbose => $DEBUG )
         ) {
-            return $self->_error(loc("Error extracting archive '%1': %2", 
-                                $self->archive, $buffer ));
+            return $self->_error(loc(
+                            "Error listing contents of archive '%1': %2", 
+                            $self->archive, $buffer ));
         }      
-        
+    
         unless( $buffer ) {
-            $self->_error(loc("No buffer captured, unable to tell extracted ".
-                              "files or extraction dir for '%1'",
+            $self->_error(loc("No buffer captured, unable to tell ".     
+                              "extracted files or extraction dir for '%1'",
                               $self->archive));
         } else {                         
             ### if we're on solaris we /might/ be using /bin/tar, which has
             ### a weird output format... we might also be using
-            ### /usr/local/bin/tar, which is gnu tar, which is perfectly fine...
-            ### so we have to do some guessing here =/
+            ### /usr/local/bin/tar, which is gnu tar, which is perfectly 
+            ### fine... so we have to do some guessing here =/
             my @files = map { chomp; 
                           !ON_SOLARIS ? $_ 
-                                      : (m|^ x \s+       # 'xtract' -- sigh
-                                            (.+?),      # the actual file name
+                                      : (m|^ x \s+  # 'xtract' -- sigh
+                                            (.+?),  # the actual file name
                                             \s+ [\d,.]+ \s bytes,
                                             \s+ [\d,.]+ \s tape \s blocks
                                         |x ? $1 : $_); 
@@ -454,6 +460,23 @@ sub _untar_bin {
             $self->extract_path( File::Spec->rel2abs($dir) );    
         }
     }
+    
+    ### now actually extract it ###
+    {   my $cmd = $self->is_tgz 
+            ? [$self->bin_gzip, '-cdf', $self->archive, '|', 
+               $self->bin_tar, '-xf', '-'] 
+            : [$self->bin_tar, '-xf', $self->archive];         
+    
+        my $buffer = '';
+        unless( scalar run( command => $cmd, 
+                            buffer  => \$buffer,  
+                            verbose => $DEBUG )
+        ) {
+            return $self->_error(loc("Error extracting archive '%1': %2", 
+                            $self->archive, $buffer ));
+        }      
+    }      
+
   
     ### we got here, no error happened
     return 1;    
@@ -463,18 +486,32 @@ sub _untar_bin {
 sub _untar_at {  
     my $self = shift;
 
-    ### required modules -- IO::Zlib is only required for gzipped files ###
-    my $use_list = { 'Archive::Tar' => '0.0' };
-       $use_list->{  'IO::Zlib' }   =  '0.0' if $self->is_tgz;
-       
-    ### check if we have all required modules ###
-    unless( can_load( modules => $use_list ) ) {
-        my $which = $self->is_tgz 
-                        ? 'Archive::Tar and/or IO::Zlib' 
-                        : 'Archive::Tar';
+    ### we definately need A::T, so load that first
+    {   my $use_list = { 'Archive::Tar' => '0.0' };
+        
+        unless( can_load( modules => $use_list ) ) {
+        
+            return $self->_error(loc("You do not have '%1' installed - " . 
+                                 "Please install it as soon as possible.",
+                                 'Archive::Tar'));   
+        }
+    }
     
-        return $self->_error(loc("You do not have '%1' installed - Please " . 
-                                 "install it as soon as possible.", $which));   
+    ### we will need Compress::Zlib too, if it's a tgz... and IO::Zlib
+    ### if A::T's version is 0.99 or higher
+    if( $self->is_tgz ) {
+        my $use_list = { 'Compress::Zlib' => '0.0' };
+           $use_list->{ 'IO::Zlib' } = '0.0' 
+                if $Archive::Tar::VERSION >= '0.99';
+    
+        unless( can_load( modules => $use_list ) ) {
+            my $which = join '/', sort keys %$use_list;
+            
+            return $self->_error(loc(
+                                "You do not have '%1' installed - Please ".
+                                "install it as soon as possible.", $which));
+            
+        }
     }
     
     my $tar = Archive::Tar->new();
@@ -771,7 +808,7 @@ See the section on C<GLOBAL VARIABLES> to see how to alter this order.
 =head1 CAVEATS
 
 C<Archive::Extract> trusts on the extension of the archive to determine
-what type it is, and what extractor methods therefor can be used. If 
+what type it is, and what extractor methods therefore can be used. If 
 your archives do not have any of the extensions as described in the 
 C<new()> method, you will have to specify the type explicitly, or 
 C<Archive::Extract> will not be able to extract the archive for you.
