@@ -13,7 +13,10 @@ use Params::Check               qw[check];
 use Module::Load::Conditional   qw[can_load check_install];
 use Locale::Maketext::Simple    Style => 'gettext';
 
+### solaris has silly /bin/tar output ###
+use constant ON_SOLARIS     => $^O eq 'solaris' ? 1 : 0;
 use constant FILE_EXISTS    => sub { -e $_[0] ? 1 : 0 };
+
 use constant TGZ            => 'tgz';
 use constant TAR            => 'tar';
 use constant GZ             => 'gz';
@@ -21,7 +24,7 @@ use constant ZIP            => 'zip';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.01';
+$VERSION        = '0.02';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -56,13 +59,15 @@ Archive::Extract -- A generic archive extracting mechanism
     ### dir that was extracted to ###
     my $outdir  = $ae->extract_path;    
  
-    
  
     ### quick check methods ###
     $ae->is_tar     # is it a .tar file?
     $ae->is_tgz     # is it a .tar.gz or .tgz file?
     $ae->is_gz;     # is it a .gz file?
     $ae->is_zip;    # is it a .zip file?      
+
+    ### absolute path to the archive you provided ###
+    $ae->archive;
 
     ### commandline tools, if found ###
     $ae->bin_tar    # path to /bin/tar, if found
@@ -104,7 +109,9 @@ my $Mapping = {
     };
 
     ### build accesssors ###
-    for my $method( keys %$tmpl, qw[_extractor _gunzip_to files extract_path] ) {
+    for my $method( keys %$tmpl, 
+                    qw[_extractor _gunzip_to files extract_path] 
+    ) {
         no strict 'refs';
         *$method = sub {
                         my $self = shift;
@@ -419,7 +426,20 @@ sub _untar_bin {
                                 $self->archive, $buffer ));
         }      
         
-        my @files = map { chomp; $_ } split $/, $buffer;
+        my $file  = File::Basename::basename( $self->archive );
+
+        ### if we're on solaris we /might/ be using /bin/tar, which has
+        ### a weird output format... we might also be using /usr/local/bin/tar,
+        ### which is gnu tar, which is perfectly fine... so we have to do some
+        ### guessing here =/
+        my @files = map { chomp; 
+                          !ON_SOLARIS ? $_ 
+                                      : (m|^ x \s+       # 'xtract' -- sigh
+                                            (.+?),      # the actual file name
+                                            \s+ [\d,.]+ \s bytes,
+                                            \s+ [\d,.]+ \s tape \s blocks
+                                        |x ? $1 : $_); 
+                    } split $/, $buffer;
         my ($dir) = -d $files[0] ? $files[0] : dirname ($files[0]);
  
         ### store the files that are in the archive ###
