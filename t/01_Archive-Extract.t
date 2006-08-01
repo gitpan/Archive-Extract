@@ -45,6 +45,11 @@ $Archive::Extract::WARN     = $Archive::Extract::WARN    = $Debug ? 1 : 0;
 
 my $tmpl = {
     ### plain files
+    'x.bz2' => {    programs    => [qw[bunzip2]],
+                    modules     => [qw[Compress::Zlib]],
+                    method      => 'is_bz2',
+                    outfile     => 'a',
+                },
     'x.tgz'     => {    programs    => [qw[gzip tar]],
                         modules     => [qw[Archive::Tar IO::Zlib]],
                         method      => 'is_tgz',
@@ -81,6 +86,18 @@ my $tmpl = {
                     outfile     => 'a',
                 },                
     ### with a directory
+    'y.tbz'     => {    programs    => [qw[bunzip2 tar]],
+                        modules     => [],
+                        method      => 'is_tbz',
+                        outfile     => 'z',
+                        outdir      => 'y'
+                    },
+    'y.tar.bz2' => {    programs    => [qw[bunzip2 tar]],
+                        modules     => [],
+                        method      => 'is_tbz',
+                        outfile     => 'z',
+                        outdir      => 'y'
+                    },    
     'y.tgz'     => {    programs    => [qw[gzip tar]],
                         modules     => [qw[Archive::Tar IO::Zlib]],
                         method      => 'is_tgz',
@@ -175,7 +192,7 @@ for my $switch (0,1) {
         ### where to extract to -- try both dir and file for gz files
         ### XXX test me!
         #my @outs = $ae->is_gz ? ($abs_path, $OutDir) : ($OutDir);
-        my @outs = $ae->is_gz ? ($abs_path) : ($OutDir);
+        my @outs = $ae->is_gz || $ae->is_bz2 ? ($abs_path) : ($OutDir);
 
         skip "No binaries or modules to extract ".$archive, 
             (10 * scalar @outs) if $mod_fail && $pgm_fail;
@@ -183,7 +200,7 @@ for my $switch (0,1) {
         for my $use_buffer (1,0) {
 
             ### test buffers ###
-            my $turn_off = !$use_buffer &&!$pgm_fail &&
+            my $turn_off = !$use_buffer && !$pgm_fail &&
                             $Archive::Extract::PREFER_BIN;
 
             ### whitebox test ###

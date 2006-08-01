@@ -18,3 +18,4 @@ t/src/y.tar
 t/src/y.tar.gz
 t/src/y.tgz
 t/src/y.zip
+META.yml                                 Module meta-data (added by MakeMaker)
