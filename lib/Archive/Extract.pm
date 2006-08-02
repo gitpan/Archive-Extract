@@ -26,7 +26,7 @@ use constant TBZ            => 'tbz';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.11';
+$VERSION        = '0.11_01';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -309,6 +309,12 @@ sub extract {
             $self->_error(loc("Could not chdir to '%1': %2", $dir, $!));
             $ok = 0; last EXTRACT;
         }
+
+        ### set files to an empty array ref, so there's always an array
+        ### ref IN the accessor, to avoid errors like:
+        ### Can't use an undefined value as an ARRAY reference at
+        ### ../lib/Archive/Extract.pm line 742. (rt #19815)
+        $self->files( [] );
 
         ### find what extractor method to use ###
         while( my($type,$method) = each %$Mapping ) {
@@ -817,7 +823,9 @@ sub _unzip_az {
 
 sub __get_extract_dir {
     my $self    = shift;
-    my $files   = shift or return;
+    my $files   = shift || [];
+    
+    return unless scalar @$files;
 
     my($dir1, $dir2);
     for my $aref ( [ \$dir1, 0 ], [ \$dir2, -1 ] ) {

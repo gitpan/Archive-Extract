@@ -248,10 +248,15 @@ for my $switch (0,1) {
                 unlink $abs_path;
                 ok( !(-e $abs_path), "Output file successfully removed" );
     
-                eval { rmtree( $ae->extract_path ) };
-                ok( !$@,            "   rmtree gave no error" );
-                ok( !(-d $ae->extract_path ),
+                SKIP: {
+                    skip "No extract patch captured, can't remove paths", 2
+                        unless $ae->extract_path;
+    
+                    eval { rmtree( $ae->extract_path ) }; 
+                    ok( !$@,        "   rmtree gave no error" );
+                    ok( !(-d $ae->extract_path ),
                                     "   Extract dir succesfully removed" );
+                }
             }
         }
     } }
