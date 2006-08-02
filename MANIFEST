@@ -5,6 +5,7 @@ README
 t/01_Archive-Extract.t
 t/src/.exists
 t/src/double_dir.zip
+t/src/x.bz2
 t/src/x.gz
 t/src/x.jar
 t/src/x.par
@@ -15,7 +16,9 @@ t/src/x.zip
 t/src/y.jar
 t/src/y.par
 t/src/y.tar
+t/src/y.tar.bz2
 t/src/y.tar.gz
+t/src/y.tbz
 t/src/y.tgz
 t/src/y.zip
 META.yml                                 Module meta-data (added by MakeMaker)
