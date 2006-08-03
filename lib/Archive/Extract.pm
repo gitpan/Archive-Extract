@@ -26,7 +26,7 @@ use constant TBZ            => 'tbz';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.11_01';
+$VERSION        = '0.11_02';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -84,9 +84,9 @@ Archive::Extract -- A generic archive extracting mechanism
 Archive::Extract is a generic archive extraction mechanism.
 
 It allows you to extract any archive file of the type .tar, .tar.gz,
-.gz or .zip without having to worry how it does so, or use different
-interfaces for each type by using either perl modules, or commandline
-tools on your system.
+.gz, tar.bz, .tbz2, .bz2 or .zip without having to worry how it does 
+so, or use different interfaces for each type by using either perl 
+modules, or commandline tools on your system.
 
 See the C<HOW IT WORKS> section further down for details.
 
@@ -764,7 +764,7 @@ sub _unzip_bin {
     }
 
     ### now, extract the archive ###
-    {   my $cmd = [ $self->bin_unzip, '-qq', $self->archive ];
+    {   my $cmd = [ $self->bin_unzip, '-qq', '-o', $self->archive ];
 
         my $buffer;
         unless( scalar run( command => $cmd,

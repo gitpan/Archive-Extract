@@ -46,7 +46,7 @@ $Archive::Extract::WARN     = $Archive::Extract::WARN    = $Debug ? 1 : 0;
 my $tmpl = {
     ### plain files
     'x.bz2' => {    programs    => [qw[bunzip2]],
-                    modules     => [qw[Compress::Zlib]],
+                    modules     => [undef],
                     method      => 'is_bz2',
                     outfile     => 'a',
                 },
@@ -87,13 +87,13 @@ my $tmpl = {
                 },                
     ### with a directory
     'y.tbz'     => {    programs    => [qw[bunzip2 tar]],
-                        modules     => [],
+                        modules     => [undef],
                         method      => 'is_tbz',
                         outfile     => 'z',
                         outdir      => 'y'
                     },
     'y.tar.bz2' => {    programs    => [qw[bunzip2 tar]],
-                        modules     => [],
+                        modules     => [undef],
                         method      => 'is_tbz',
                         outfile     => 'z',
                         outdir      => 'y'
@@ -179,12 +179,20 @@ for my $switch (0,1) {
         ### check if we can run this test ###
         my $pgm_fail; my $mod_fail;
         for my $pgm ( @{$tmpl->{$archive}->{programs}} ) {
+            ### no binary extract method
+            $pgm_fail++ unless $pgm;
+
+            ### we dont have the program
             $pgm_fail++ unless $Archive::Extract::PROGRAMS->{$pgm} &&
                                $Archive::Extract::PROGRAMS->{$pgm};
 
         }
 
         for my $mod ( @{$tmpl->{$archive}->{modules}} ) {
+            ### no module extract method
+            $mod_fail++ unless $mod;
+
+            ### we dont have the module
             $mod_fail++ unless check_install( module => $mod );
         }
 
@@ -245,11 +253,11 @@ for my $switch (0,1) {
                                     "Extract dir is expected '$abs_dir'" );
                 }
     
-                unlink $abs_path;
+                1 while unlink $abs_path;
                 ok( !(-e $abs_path), "Output file successfully removed" );
     
                 SKIP: {
-                    skip "No extract patch captured, can't remove paths", 2
+                    skip "No extract path captured, can't remove paths", 2
                         unless $ae->extract_path;
     
                     eval { rmtree( $ae->extract_path ) }; 
