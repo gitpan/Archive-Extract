@@ -5,16 +5,6 @@ BEGIN {
     }
 }    
 
-### uninitialized value in File::Spec warnings come from A::Zip:
-# t/01_Archive-Extract....ok 135/0Use of uninitialized value in concatenation (.) or string at /opt/lib/perl5/5.8.3/File/Spec/Unix.pm line 313.
-#         File::Spec::Unix::catpath('File::Spec','','','undef') called at /opt/lib/perl5/site_perl/5.8.3/Archive/Zip.pm line 473
-#         Archive::Zip::_asLocalName('') called at /opt/lib/perl5/site_perl/5.8.3/Archive/Zip.pm line 652
-#         Archive::Zip::Archive::extractMember('Archive::Zip::Archive=HASH(0x9679c8)','Archive::Zip::ZipFileMember=HASH(0x9678fc)') called at ../lib/Archive/Extract.pm line 753
-#         Archive::Extract::_unzip_az('Archive::Extract=HASH(0x966eac)') called at ../lib/Archive/Extract.pm line 674
-#         Archive::Extract::_unzip('Archive::Extract=HASH(0x966eac)') called at ../lib/Archive/Extract.pm line 275
-#         Archive::Extract::extract('Archive::Extract=HASH(0x966eac)','to','/Users/kane/sources/p4/other/archive-extract/t/out') called at t/01_Archive-Extract.t line 180
-#BEGIN { $SIG{__WARN__} = sub { require Carp; Carp::cluck(@_) } };
-
 BEGIN { chdir 't' if -d 't' };
 BEGIN { mkdir 'out' unless -d 'out' };
 
@@ -28,6 +18,21 @@ use File::Spec::Unix;
 use File::Path;
 use Data::Dumper;
 use Module::Load::Conditional   qw[check_install];
+
+### uninitialized value in File::Spec warnings come from A::Zip:
+# t/01_Archive-Extract....ok 135/0Use of uninitialized value in concatenation (.) or string at /opt/lib/perl5/5.8.3/File/Spec/Unix.pm line 313.
+#         File::Spec::Unix::catpath('File::Spec','','','undef') called at /opt/lib/perl5/site_perl/5.8.3/Archive/Zip.pm line 473
+#         Archive::Zip::_asLocalName('') called at /opt/lib/perl5/site_perl/5.8.3/Archive/Zip.pm line 652
+#         Archive::Zip::Archive::extractMember('Archive::Zip::Archive=HASH(0x9679c8)','Archive::Zip::ZipFileMember=HASH(0x9678fc)') called at ../lib/Archive/Extract.pm line 753
+#         Archive::Extract::_unzip_az('Archive::Extract=HASH(0x966eac)') called at ../lib/Archive/Extract.pm line 674
+#         Archive::Extract::_unzip('Archive::Extract=HASH(0x966eac)') called at ../lib/Archive/Extract.pm line 275
+#         Archive::Extract::extract('Archive::Extract=HASH(0x966eac)','to','/Users/kane/sources/p4/other/archive-extract/t/out') called at t/01_Archive-Extract.t line 180
+#BEGIN { $SIG{__WARN__} = sub { require Carp; Carp::cluck(@_) } };
+
+if( $^O =~ /(?:cygwin|win32)/i ) {
+    diag( "Older versions of Archive::Zip may cause File::Spec warnings" );
+    diag( "See bug #19713 in rt.cpan.org. It is safe to ignore them" );
+}
 
 my $Debug   = $ARGV[0] ? 1 : 0;
 
@@ -180,7 +185,7 @@ for my $switch (0,1) {
         my $pgm_fail; my $mod_fail;
         for my $pgm ( @{$tmpl->{$archive}->{programs}} ) {
             ### no binary extract method
-            $pgm_fail++ unless $pgm;
+            $pgm_fail++, next unless $pgm;
 
             ### we dont have the program
             $pgm_fail++ unless $Archive::Extract::PROGRAMS->{$pgm} &&
@@ -190,7 +195,7 @@ for my $switch (0,1) {
 
         for my $mod ( @{$tmpl->{$archive}->{modules}} ) {
             ### no module extract method
-            $mod_fail++ unless $mod;
+            $mod_fail++, next unless $mod;
 
             ### we dont have the module
             $mod_fail++ unless check_install( module => $mod );
