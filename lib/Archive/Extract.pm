@@ -26,7 +26,7 @@ use constant TBZ            => 'tbz';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.12';
+$VERSION        = '0.14';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -37,7 +37,7 @@ local $Params::Check::VERBOSE = $Params::Check::VERBOSE = 1;
 
 =head1 NAME
 
-Archive::Extract -- A generic archive extracting mechanism
+Archive::Extract - A generic archive extracting mechanism
 
 =head1 SYNOPSIS
 
@@ -744,7 +744,7 @@ sub _unzip_bin {
     ### first, get the files.. it must be 2 different commands with 'unzip' :(
     {   my $cmd = [ $self->bin_unzip, '-Z', '-1', $self->archive ];
 
-        my $buffer;
+        my $buffer = '';
         unless( scalar run( command => $cmd,
                             verbose => $DEBUG,
                             buffer  => \$buffer )
