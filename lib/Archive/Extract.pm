@@ -26,7 +26,7 @@ use constant TBZ            => 'tbz';
 
 use vars qw[$VERSION $PREFER_BIN $PROGRAMS $WARN $DEBUG];
 
-$VERSION        = '0.15_01';
+$VERSION        = '0.15_03';
 $PREFER_BIN     = 0;
 $WARN           = 1;
 $DEBUG          = 0;
@@ -842,7 +842,7 @@ sub _unzip_az {
 sub __get_extract_dir {
     my $self    = shift;
     my $files   = shift || [];
-    
+
     return unless scalar @$files;
 
     my($dir1, $dir2);
@@ -851,9 +851,11 @@ sub __get_extract_dir {
 
         ### add a catdir(), so that any trailing slashes get
         ### take care of (removed)
+        ### also, a catdir() normalises './dir/foo' to 'dir/foo';
+        ### which was the problem in bug #23999
         my $res = -d $files->[$pos]
                     ? File::Spec->catdir( $files->[$pos], '' )
-                    : dirname( $files->[$pos] );
+                    : File::Spec->catdir( dirname( $files->[$pos] ) ); 
 
         $$dir = $res;
     }
