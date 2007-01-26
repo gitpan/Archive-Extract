@@ -5,7 +5,6 @@ BEGIN {
     }
 }    
 
-
 BEGIN { chdir 't' if -d 't' };
 BEGIN { mkdir 'out' unless -d 'out' };
 
@@ -40,7 +39,7 @@ if( IS_WIN32 or IS_CYGWIN ) {
 }
 
 my $Debug   = $ARGV[0] ? 1 : 0;
-
+my $Me      = basename( $0 );
 my $Class   = 'Archive::Extract';
 my $Self    = File::Spec->rel2abs( 
                     IS_WIN32 ? &Win32::GetShortPathName( cwd() ) : cwd() 
@@ -168,6 +167,21 @@ if( $Debug ) {
     diag( "IPC::Open3 vesion: $IPC::Open3::VERSION" );
 }
 
+### test all type specifications to new()
+### this tests bug #24578: Wrong check for `type' argument
+{   my $meth = 'types';
+
+    can_ok( $Class, $meth );
+
+    my @types = $Class->$meth;
+    ok( scalar(@types),         "   Got a list of types" );
+    
+    for my $type ( @types ) {
+        my $obj = $Class->new( archive => $Me, type => $type );
+        ok( $obj,               "   Object created based on '$type'" );
+        ok( !$obj->error,       "       No error logged" );
+    }
+}    
 
 ### XXX whitebox test
 ### test __get_extract_dir 
@@ -193,6 +207,8 @@ if( $Debug ) {
                       } $dir, File::Spec->catfile( $dir, [keys %$tmpl]->[0] );
         
         my $res = $Class->$meth( \@files );
+        $res = &Win32::GetShortPathName( $res ) if IS_WIN32;
+
         ok( $res,               "Found extraction dir '$res'" );
         is( $res, $SrcDir,      "   Is expected dir '$SrcDir'" );
     }        
@@ -262,10 +278,9 @@ for my $switch (0,1) {
         ### be a problem...
         local $IPC::Cmd::WARN = 0;
         local $IPC::Cmd::WARN = 0;
+        
+        for my $use_buffer ( IPC::Cmd->can_capture_buffer , 0 ) {
 
-        ### 'return; in list context doesn't provide an entry in the list :(
-        for my $use_buffer ( (IPC::Cmd->can_capture_buffer||0) , 0 ) {
-    
             ### test buffers ###
             my $turn_off = !$use_buffer && !$pgm_fail &&
                             $Archive::Extract::PREFER_BIN;
