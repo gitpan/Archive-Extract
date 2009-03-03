@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Archive-Extract
-version:            0.31_01
+version:            0.31_02
 abstract:           Generic archive extracting mechanism
 author:
     - Jos Boumans <kane[at]cpan.org>

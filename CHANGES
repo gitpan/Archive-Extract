@@ -1,3 +1,9 @@
+Changes for 0.31_02 Tue Mar  3 17:01:26 2009
+============================================
+* Address: #43278: Explicitly tell Archive::Zip where to put the files
+In certain edge cases, archive::zip would extract to dirname($0) instead
+of cwd(); Now we tell Archive::Zip explicitly where to extract to. 
+
 Changes for 0.31_01 Fri Feb  6 15:39:13 2009
 ============================================
 * Address #40138; .tar files on Win32 would not extract properly with
