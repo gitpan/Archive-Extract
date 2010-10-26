@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Archive-Extract
-version:            0.44
+version:            0.46
 abstract:           Generic archive extracting mechanism
 author:
     - Jos Boumans <kane[at]cpan.org>
@@ -14,7 +14,7 @@ requires:
     File::Basename:       0
     File::Path:           0
     File::Spec:           0.82
-    IPC::Cmd:             0.42
+    IPC::Cmd:             0.64
     Locale::Maketext::Simple:  0
     Module::Load::Conditional:  0.04
     Params::Check:        0.07
