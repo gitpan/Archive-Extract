@@ -28,4 +28,4 @@ requires:
   Test::More: 0
 resources:
   repository: https://github.com/jib/archive-extract
-version: 0.54
+version: 0.56
